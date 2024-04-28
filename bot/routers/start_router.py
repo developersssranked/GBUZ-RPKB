@@ -208,6 +208,7 @@ async def accept (call: CallbackQuery, bot: Bot, state: FSMContext):
 
     user_chat_id = int(call.data.split('_')[1])
 
+    await bot.send_message(chat_id=os.getenv("ADMIN2_CHAT_ID"),text='Заявка одобрена')
     await call.message.copy_to(chat_id=os.getenv("ADMIN2_CHAT_ID"),reply_markup=get_answer_keyboard(user_chat_id))
 
 
@@ -219,6 +220,7 @@ async def close (call: CallbackQuery, bot: Bot, state: FSMContext):
 
     user_chat_id = int(call.data.split('_')[1])
 
+    await bot.send_message(chat_id=os.getenv("ADMIN2_CHAT_ID"),text='Заявка отклонена')
     await call.message.copy_to(chat_id=os.getenv("ADMIN2_CHAT_ID"),reply_markup=get_answer_keyboard(user_chat_id))
 
 
