@@ -18,8 +18,8 @@ def get_accept_or_close_keyboard(user_chat_id):
     return accept_or_close_keyboard
 
 choose_organization = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text='ГБУЗ РБ РПКБ', callback_data='our_org')],
-    [InlineKeyboardButton(text='Стороняя организация', callback_data='not_our_org')],
+    [InlineKeyboardButton(text='Заявка на пропуск автомобиля сотрудника', callback_data='our_org')],
+    [InlineKeyboardButton(text='Въезд на территорию стороняя организация', callback_data='not_our_org')],
     ])
 
 

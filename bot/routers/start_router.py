@@ -21,14 +21,14 @@ async def start(message:Message, bot: Bot, state: FSMContext):
     await state.clear()
 
 
-    await message.answer('Здравствуйте! Выберите организацию',reply_markup=choose_organization)
+    await message.answer('Здравствуйте! Выберите нужный вариант',reply_markup=choose_organization)
     
 
 @router.callback_query(F.data == 'our_org')
 async def our_org(call: CallbackQuery, bot: Bot, state: FSMContext):
 
     await bot.answer_callback_query(call.id)
-    await call.message.answer('Введите фамилию, имя, отчество')
+    await call.message.answer('Введите фамилию, имя, отчество заявителя')
 
     await state.set_state(ContactInformationOurOrgState.full_name)
     await state.update_data(organization='ГБУЗ РБ РКПБ')
@@ -49,7 +49,7 @@ async def get_organiztion(message: Message, bot: Bot, state: FSMContext):
     organization = message.text.strip()
     await state.update_data(organization = organization)
     
-    await message.answer('Введите цель заезда. Если хотите оставить пустым, то отправьте .')
+    await message.answer('Введите цель заезда')
     await state.set_state(ContactInformationOurOrgState.motive)
 
 @router.message(ContactInformationOurOrgState.motive)
@@ -57,12 +57,10 @@ async def get_motive(message: Message, bot: Bot, state: FSMContext):
 
     motive = message.text.strip()
 
-    if motive == '.':
-        motive = 'Не указан'
 
     await state.update_data(motive = motive)
     
-    await message.answer('Введите фамилию, имя, отчество')
+    await message.answer('Введите ваше фамилию, имя, отчество')
     await state.set_state(ContactInformationOurOrgState.full_name)
 
 
@@ -71,28 +69,40 @@ async def get_full_name(message: Message, bot: Bot, state: FSMContext):
 
     full_name = message.text.strip()
     await state.update_data(full_name = full_name)
+
+    data = await state.get_data()
     
+    if data['organization'] == 'ГБУЗ РБ РКПБ':
+        
+        await message.answer('Ввведите фамилию, имя, отчество получателя')
+        await state.set_state(ContactInformationOurOrgState.reciepent_fullName)
+        
+    
+    else:
+        await message.answer('Введите марку автомобиля')
+        await state.set_state(ContactInformationOurOrgState.car_brand)
+
+@router.message(ContactInformationOurOrgState.reciepent_fullName)  # Только для ГБУЗ РКПб
+async def get_reciepentfullName(message: Message, bot: Bot, state: FSMContext):
+    reciepent_fullName = message.text.strip()
+
+    await state.update_data(reciepent_fullName = reciepent_fullName)
+
     await message.answer('Введите должность')
     await state.set_state(ContactInformationOurOrgState.post)
 
+
     
-@router.message(ContactInformationOurOrgState.post)
+@router.message(ContactInformationOurOrgState.post)  # Только для ГБУЗ РКПб
 async def get_post(message: Message, bot: Bot, state: FSMContext):
 
     post = message.text.strip()
     await state.update_data(post = post)
 
-    data = await state.get_data()
-
-    if data['organization'] == 'ГБУЗ РБ РКПБ':
-
-
-        await message.answer('Введите название подразделения')
-        await state.set_state(ContactInformationOurOrgState.subdivision)
+    
+    await message.answer('Введите название подразделения')
+    await state.set_state(ContactInformationOurOrgState.subdivision)
         
-    else:
-        await message.answer('Введите марку автомобиля')
-        await state.set_state(ContactInformationOurOrgState.car_brand)
 
 
 
@@ -152,29 +162,48 @@ async def get_car_number(message: Message, bot: Bot, state: FSMContext):
 
    
 
+    try:
 
-    if await utils.validate_car_number(car_number):
+        if await utils.validate_car_number(car_number):
 
+            
+            await state.update_data(car_number = car_number)
+
+            
+            if data['organization'] == 'ГБУЗ РБ РКПБ':
+
+                await message.answer('Введите личный номер сотового телефона')
+
+                await state.set_state(ContactInformationOurOrgState.phone_number)
         
-        await state.update_data(car_number = car_number)
+            else:
 
-        
-        if data['organization'] == 'ГБУЗ РБ РКПБ':
+                await message.answer('Введите дополнительные сведения')
+                await state.set_state(ContactInformationOurOrgState.dop_data)
 
-            await message.answer('Введите личный номер сотового телефона')
-
-            await state.set_state(ContactInformationOurOrgState.phone_number)
-    
         else:
-            message_to_admin = f'Название организации: {data["organization"]}\nЦель заезда: {data["motive"]}\nФИО: {data["full_name"]}\nДолжность: {data["post"]}\nМарка автомобиля: {data["car_brand"]}\nЦвет автомобиля: {data["car_color"]}\nГос. номер автомобиля: {data["car_number"]}'
-
-            await message.answer('Спасибо! Ваша заявка принята в обработку,когда ее рассмотрят вам сообщат результат.')
-            await bot.send_message(chat_id=os.getenv('ADMIN1_CHAT_ID'),text=message_to_admin, reply_markup=get_accept_or_close_keyboard(message.from_user.id))
-
-    else:
-        
+            
+            await message.answer('Номер автомобиля в неверном формате. Введите номер автомобиля в формате X999XX999')
+            await state.set_state(ContactInformationOurOrgState.car_number)
+    except:
         await message.answer('Номер автомобиля в неверном формате. Введите номер автомобиля в формате X999XX999')
         await state.set_state(ContactInformationOurOrgState.car_number)
+        
+
+@router.message(ContactInformationOurOrgState.dop_data)    #Только для сторонней организации
+async def get_phone_number(message: Message, bot: Bot, state: FSMContext):
+
+    dop_data = message.text.strip()
+
+    await state.update_data(dop_data = dop_data)
+    
+    data = await state.get_data()
+
+
+    message_to_admin = f'Пользователь: @{message.from_user.username}\nНазвание организации: {data["organization"]}\nЦель заезда: {data["motive"]}\nФИО заявителя: {data["full_name"]}\nМарка автомобиля: {data["car_brand"]}\nЦвет автомобиля: {data["car_color"]}\nГос. номер автомобиля: {data["car_number"]}\nДополнительные сведения: {data["dop_data"]}'
+
+    await message.answer('Спасибо! Ваша заявка принята в обработку,когда ее рассмотрят вам сообщат результат.')
+    await bot.send_message(chat_id=os.getenv('ADMIN1_CHAT_ID'),text=message_to_admin, reply_markup=get_accept_or_close_keyboard(message.from_user.id))
 
 
 
@@ -184,21 +213,27 @@ async def get_car_number(message: Message, bot: Bot, state: FSMContext):
 async def get_phone_number(message: Message, bot: Bot, state: FSMContext):
 
     phone_number = message.text.strip()
+    try:
 
-    if await utils.validate_phone_number(phone_number):
-    
-        await state.update_data(phone_number = phone_number)
-
-        data = await state.get_data()
-        await message.answer('Спасибо! Ваша заявка принята в обработку,когда ее рассмотрят вам сообщат результат.')
-
-        message_to_admin = f'Название организации: {data["organization"]}\nФИО: {data["full_name"]}\nДолжность: {data["post"]}\nПодразделение: {data["subdivision"]}\nПричина обращения: {data["reason_of_petition"]}\nМарка автомобиля: {data["car_brand"]}\nЦвет автомобиля: {data["car_color"]}\nГос. номер автомобиля: {data["car_number"]}\nЛичный номер сотового телефона: {data["phone_number"]}'
-
-        await bot.send_message(chat_id=os.getenv('ADMIN1_CHAT_ID'),text=message_to_admin, reply_markup=get_accept_or_close_keyboard(message.from_user.id))
-    else:
+        if await utils.validate_phone_number(phone_number):
         
+            await state.update_data(phone_number = phone_number)
+
+            data = await state.get_data()
+            await message.answer('Спасибо! Ваша заявка принята в обработку,когда ее рассмотрят вам сообщат результат.')
+
+            message_to_admin = f'Пользователь: @{message.from_user.username}\nНазвание организации: {data["organization"]}\nФИО заявителя: {data["full_name"]}\nФИО получателя: {data["reciepent_fullName"]}\nДолжность: {data["post"]}\nПодразделение: {data["subdivision"]}\nПричина обращения: {data["reason_of_petition"]}\nМарка автомобиля: {data["car_brand"]}\nЦвет автомобиля: {data["car_color"]}\nГос. номер автомобиля: {data["car_number"]}\nЛичный номер сотового телефона: {data["phone_number"]}'
+
+            await bot.send_message(chat_id=os.getenv('ADMIN1_CHAT_ID'),text=message_to_admin, reply_markup=get_accept_or_close_keyboard(message.from_user.id))
+        else:
+            
+            await message.answer('Номер телефона в неверном формате.')
+            await state.set_state(ContactInformationOurOrgState.phone_number)
+    except Exception as ex:
+        print(str(ex))
         await message.answer('Номер телефона в неверном формате.')
         await state.set_state(ContactInformationOurOrgState.phone_number)
+
         
 
 @router.callback_query(lambda call: 'accept' in call.data)

@@ -12,3 +12,5 @@ class ContactInformationOurOrgState(StatesGroup):
     car_color: str = State()
     car_number: str = State()
     phone_number: str = State()
+    dop_data: str = State()
+    reciepent_fullName: str = State()
