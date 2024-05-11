@@ -3,12 +3,15 @@ from aiogram import Router
 from aiogram import F, Bot
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
+from aiogram.filters import Command
 
 
 from bot.FSMclasses.main_FSM import ContactInformationOurOrgState
+from bot.FSMclasses.permission_FSM import PermissionState
 from bot.FSMclasses.p2p_messaging_FSM import AnswerToUser
-from bot.keyboards.main_kb import choose_organization,get_accept_or_close_keyboard,get_answer_keyboard
+from bot.keyboards.main_kb import choose_organization,get_accept_or_close_keyboard,get_answer_keyboard, get_status_user_keyboard, get_change_user_status_keyboard
 from bot.utils import utils
+from database import db
 
 import os
 
@@ -20,8 +23,27 @@ router = Router()
 async def start(message:Message, bot: Bot, state: FSMContext):
     await state.clear()
 
+    if not db.is_exist_user(message.from_user.username):
+        
+        users_data = {
+            'username' : message.from_user.username,
+            'chat_id' : message.from_user.id
+            }
+        
+        db.insert_user_DB(users_data=users_data)
+        await bot.send_message(os.getenv('ADMIN_CHAT_ID'),f'Пользователь @{ message.from_user.username } запустил бота', reply_markup = get_status_user_keyboard(message.from_user.id)) #TODO добавить клавиатуру админу
+        await bot.send_message(message.from_user.id, 'Ваша заявка на использование бота отправлена. Вы получите уведомление после ее рассмотрения')
+    
+    else:
 
-    await message.answer('Здравствуйте! Выберите нужный вариант',reply_markup=choose_organization)
+        if db.get_user_status(username = message.from_user.username)==1:
+
+
+            await message.answer('Здравствуйте!\nВыберите нужный вариант',reply_markup=choose_organization)
+
+    
+
+
     
 
 @router.callback_query(F.data == 'our_org')
@@ -60,7 +82,7 @@ async def get_motive(message: Message, bot: Bot, state: FSMContext):
 
     await state.update_data(motive = motive)
     
-    await message.answer('Введите ваше фамилию, имя, отчество')
+    await message.answer('Введите вашу фамилию, имя, отчество')
     await state.set_state(ContactInformationOurOrgState.full_name)
 
 
@@ -79,7 +101,7 @@ async def get_full_name(message: Message, bot: Bot, state: FSMContext):
         
     
     else:
-        await message.answer('Введите марку автомобиля')
+        await message.answer('Введите марку и модель автомобиля')
         await state.set_state(ContactInformationOurOrgState.car_brand)
 
 @router.message(ContactInformationOurOrgState.reciepent_fullName)  # Только для ГБУЗ РКПб
@@ -88,7 +110,7 @@ async def get_reciepentfullName(message: Message, bot: Bot, state: FSMContext):
 
     await state.update_data(reciepent_fullName = reciepent_fullName)
 
-    await message.answer('Введите должность')
+    await message.answer('Введите должность сотрудника, получающего пропуск')
     await state.set_state(ContactInformationOurOrgState.post)
 
 
@@ -112,7 +134,7 @@ async def get_subdivision(message: Message, bot: Bot, state: FSMContext):
     subdivision = message.text.strip()
     await state.update_data(subdivision = subdivision)
     
-    await message.answer('Введите причину обращения. Если хотите оставить пустым, то отправьте .')
+    await message.answer('Введите причину обращения.\nЕсли хотите оставить пустым, то отправьте «.»')
     await state.set_state(ContactInformationOurOrgState.reason_of_petition)
 
 
@@ -126,7 +148,7 @@ async def get_reason_of_petition(message: Message, bot: Bot, state: FSMContext):
 
     await state.update_data(reason_of_petition = reason_of_petition)
     
-    await message.answer('Введите марку автомобиля')
+    await message.answer('Введите марку и модель автомобиля')
     await state.set_state(ContactInformationOurOrgState.car_brand)
     
 
@@ -172,13 +194,13 @@ async def get_car_number(message: Message, bot: Bot, state: FSMContext):
             
             if data['organization'] == 'ГБУЗ РБ РКПБ':
 
-                await message.answer('Введите личный номер сотового телефона')
+                await message.answer('Введите ваш номер сотового телефона')
 
                 await state.set_state(ContactInformationOurOrgState.phone_number)
         
             else:
 
-                await message.answer('Введите дополнительные сведения')
+                await message.answer('Введите дополнительную информация. \nЕсли хотите пропустить напишите «.»')
                 await state.set_state(ContactInformationOurOrgState.dop_data)
 
         else:
@@ -195,6 +217,9 @@ async def get_phone_number(message: Message, bot: Bot, state: FSMContext):
 
     dop_data = message.text.strip()
 
+    if dop_data == '.':
+        dop_data = 'Не указано'
+
     await state.update_data(dop_data = dop_data)
     
     data = await state.get_data()
@@ -203,7 +228,7 @@ async def get_phone_number(message: Message, bot: Bot, state: FSMContext):
     message_to_admin = f'Пользователь: @{message.from_user.username}\nНазвание организации: {data["organization"]}\nЦель заезда: {data["motive"]}\nФИО заявителя: {data["full_name"]}\nМарка автомобиля: {data["car_brand"]}\nЦвет автомобиля: {data["car_color"]}\nГос. номер автомобиля: {data["car_number"]}\nДополнительные сведения: {data["dop_data"]}'
 
     await message.answer('Спасибо! Ваша заявка принята в обработку,когда ее рассмотрят вам сообщат результат.')
-    await bot.send_message(chat_id=os.getenv('ADMIN1_CHAT_ID'),text=message_to_admin, reply_markup=get_accept_or_close_keyboard(message.from_user.id))
+    await bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'),text=message_to_admin, reply_markup=get_accept_or_close_keyboard(message.from_user.id))
 
 
 
@@ -224,17 +249,18 @@ async def get_phone_number(message: Message, bot: Bot, state: FSMContext):
 
             message_to_admin = f'Пользователь: @{message.from_user.username}\nНазвание организации: {data["organization"]}\nФИО заявителя: {data["full_name"]}\nФИО получателя: {data["reciepent_fullName"]}\nДолжность: {data["post"]}\nПодразделение: {data["subdivision"]}\nПричина обращения: {data["reason_of_petition"]}\nМарка автомобиля: {data["car_brand"]}\nЦвет автомобиля: {data["car_color"]}\nГос. номер автомобиля: {data["car_number"]}\nЛичный номер сотового телефона: {data["phone_number"]}'
 
-            await bot.send_message(chat_id=os.getenv('ADMIN1_CHAT_ID'),text=message_to_admin, reply_markup=get_accept_or_close_keyboard(message.from_user.id))
+            await bot.send_message(chat_id=os.getenv('ADMIN_CHAT_ID'),text=message_to_admin, reply_markup=get_accept_or_close_keyboard(message.from_user.id))
         else:
             
             await message.answer('Номер телефона в неверном формате.')
             await state.set_state(ContactInformationOurOrgState.phone_number)
     except Exception as ex:
-        print(str(ex))
         await message.answer('Номер телефона в неверном формате.')
         await state.set_state(ContactInformationOurOrgState.phone_number)
 
         
+
+#Работа с админом (принятие / отклонение заявки)
 
 @router.callback_query(lambda call: 'accept' in call.data)
 async def accept (call: CallbackQuery, bot: Bot, state: FSMContext):
@@ -243,8 +269,11 @@ async def accept (call: CallbackQuery, bot: Bot, state: FSMContext):
 
     user_chat_id = int(call.data.split('_')[1])
 
-    await bot.send_message(chat_id=os.getenv("ADMIN2_CHAT_ID"),text='Заявка одобрена')
-    await call.message.copy_to(chat_id=os.getenv("ADMIN2_CHAT_ID"),reply_markup=get_answer_keyboard(user_chat_id))
+
+    await bot.send_message(chat_id = user_chat_id, text = 'Ваша заявка одобрена')
+
+    await bot.send_message(chat_id=os.getenv("ADMIN_CHAT_ID"),text='Заявка одобрена',reply_markup=get_answer_keyboard(user_chat_id))
+
 
 
 
@@ -255,10 +284,14 @@ async def close (call: CallbackQuery, bot: Bot, state: FSMContext):
 
     user_chat_id = int(call.data.split('_')[1])
 
-    await bot.send_message(chat_id=os.getenv("ADMIN2_CHAT_ID"),text='Заявка отклонена')
-    await call.message.copy_to(chat_id=os.getenv("ADMIN2_CHAT_ID"),reply_markup=get_answer_keyboard(user_chat_id))
+    await bot.send_message(chat_id = user_chat_id, text = 'Ваша заявка отклонена')
+
+    await bot.send_message(chat_id=os.getenv("ADMIN_CHAT_ID"),text='Заявка отклонена', reply_markup=get_answer_keyboard(user_chat_id))
+    
 
 
+
+#Работа с админом (ответ пользователю)
 @router.callback_query(lambda call: 'answer' in call.data)
 async def input_answer(call: CallbackQuery, bot: Bot, state: FSMContext):
 
@@ -286,6 +319,81 @@ async def answer(message: Message, bot: Bot, state: FSMContext):
     chat_id = data['user_chat_id']
 
     await bot.send_message(chat_id=chat_id, text = answer)
+
+
+@router.callback_query(lambda call: 'okay' in call.data)
+async def set_user_status_1(call: CallbackQuery, bot: Bot):
+    await bot.answer_callback_query(call.id)
+    
+    user_chat_id = int (call.data.split('-')[-1])
+
+    db.update_user_status(chat_id = user_chat_id, status = 1)
+
+    await bot.send_message(call.from_user.id, 'Доступ пользователю разрешен')
+
+    await bot.send_message(int(user_chat_id),'Ваша заявка на использование бота одобрена')
+
+@router.callback_query(lambda call: 'not_okay' in call.data)
+async def set_user_status_0(call: CallbackQuery, bot: Bot):
+
+    await bot.answer_callback_query(call.id)
+    
+    user_chat_id = int (call.data.split('-')[-1])
+
+    db.update_user_status(chat_id = user_chat_id, status = 0)
+
+    await bot.send_message(call.from_user.id, 'Доступ пользователю запрещен')
+    
+
+
+    
+
+@router.message(Command('status'))
+async def set_users_status_by_admin(message: Message, state: FSMContext):
+    
+    if int(message.from_user.id) == int(os.getenv('ADMIN_CHAT_ID')):
+        
+        await message.answer('Введите имя пользователя, которому хотите поменять статус в формате @test123')
+        
+        await state.set_state(PermissionState.username)
+
+    else:
+        await message.answer('У вас нет прав для использования этой команды')
+
+
+@router.message(PermissionState.username)
+async def get_actual_status(message: Message, bot: Bot, state: FSMContext):
+
+    username = message.text.strip().replace('@','')
+
+    if db.is_exist_user(username):
+
+        status = db.get_user_status(username)
+
+        if status == 1:
+            status = 'Доступ разрешен'
+        else:
+            status = 'Доступ запрещен'
+
+        await message.answer(f'Пользователь @{username}\nСтатус: {status}', reply_markup = get_change_user_status_keyboard(username))
+
+    else:
+        await message.answer('Нет пользователя с таким username')
+
+
+
+    
+@router.callback_query(lambda call: 'status' in call.data)
+async def set_user_status_1(call: CallbackQuery, bot: Bot):
+    await bot.answer_callback_query(call.id)
+
+    username = call.data.split('-')[-1]
+
+    status = int(call.data.split('-')[1])
+
+    db.update_user_status(username=username,status=status)
+
+    await bot.send_message(call.from_user.id, 'Статус пользователя успешно обновлен')
 
     
 

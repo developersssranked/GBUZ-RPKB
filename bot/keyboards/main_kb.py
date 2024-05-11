@@ -29,3 +29,20 @@ def get_answer_keyboard(user_chat_id):
         ])
 
     return answer_keyboard
+
+
+def get_status_user_keyboard(user_chat_id):
+    status_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text='Разрешить доступ', callback_data = f'okay-{user_chat_id}')],
+        [InlineKeyboardButton(text='Запретить доступ', callback_data = f'not_okay-{user_chat_id}')],
+    ])
+    return status_keyboard
+
+
+def get_change_user_status_keyboard(username):
+
+    change_user_status_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text='Разрешить', callback_data = f'status-1-{username}')],
+        [InlineKeyboardButton(text='Запретить', callback_data = f'status-0-{username}')],
+    ])
+    return change_user_status_keyboard
