@@ -321,7 +321,7 @@ async def answer(message: Message, bot: Bot, state: FSMContext):
     await bot.send_message(chat_id=chat_id, text = answer)
 
 
-@router.callback_query(lambda call: 'okay' in call.data)
+@router.callback_query(lambda call: ('okay' in call.data) and ('not' not in call.data))
 async def set_user_status_1(call: CallbackQuery, bot: Bot):
     await bot.answer_callback_query(call.id)
     
