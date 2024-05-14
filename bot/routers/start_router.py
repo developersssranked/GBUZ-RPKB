@@ -352,6 +352,15 @@ async def set_user_status_0(call: CallbackQuery, bot: Bot):
 async def set_users_status_by_admin(message: Message, state: FSMContext):
     
     if int(message.from_user.id) == int(os.getenv('ADMIN_CHAT_ID')):
+
+        result_users = []
+
+        for user in db.select_all_users_status_1_DB():
+            result_users.append('@'+user[0])
+        
+        user_list_message_text ='Список пользователей:\n'+'\n\n'.join(result_users)
+
+        await message.answer(user_list_message_text)
         
         await message.answer('Введите имя пользователя, которому хотите поменять статус в формате @test123')
         

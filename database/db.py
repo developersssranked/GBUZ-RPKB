@@ -26,6 +26,9 @@ def create_table_users_DB():
     sql.close()
 
 
+
+
+
 def is_exist_users_table_DB():
     db = sqlite3.connect('database/users.db',check_same_thread=False)
     sql = db.cursor()
@@ -89,6 +92,24 @@ def get_user_status(username):
 
 
 
+def select_all_users_status_1_DB():
+    if not is_exist_users_table_DB():
+        create_table_users_DB()
+        
+    # Соединение с базой данных
+    db = sqlite3.connect('database/users.db',check_same_thread=False)
+    sql = db.cursor()
+    
+    sql.execute("SELECT username FROM users WHERE status = ?", (1,))
+    result = sql.fetchall()
+
+    db.close()
+
+    return result
+
+    
+
+print(select_all_users_status_1_DB())
 
 
 def update_user_status( status, chat_id = None, username = None):
