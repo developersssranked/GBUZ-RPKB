@@ -109,7 +109,6 @@ def select_all_users_status_1_DB():
 
     
 
-print(select_all_users_status_1_DB())
 
 
 def update_user_status( status, chat_id = None, username = None):
