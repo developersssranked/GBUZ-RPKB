@@ -22,26 +22,28 @@ router = Router()
 @router.message(F.text == '/start')
 async def start(message:Message, bot: Bot, state: FSMContext):
     await state.clear()
+    if message.from_user.username is not None:
 
-    if not db.is_exist_user(message.from_user.username):
+        if not db.is_exist_user(message.from_user.username):
+            
+            users_data = {
+                'username' : message.from_user.username,
+                'chat_id' : message.from_user.id
+                }
+            
+            db.insert_user_DB(users_data=users_data)
+            await bot.send_message(os.getenv('ADMIN_CHAT_ID'),f'Пользователь @{ message.from_user.username } запустил бота', reply_markup = get_status_user_keyboard(message.from_user.id)) #TODO добавить клавиатуру админу
+            await bot.send_message(message.from_user.id, 'Ваша заявка на использование бота отправлена. Вы получите уведомление после ее рассмотрения')
         
-        users_data = {
-            'username' : message.from_user.username,
-            'chat_id' : message.from_user.id
-            }
-        
-        db.insert_user_DB(users_data=users_data)
-        await bot.send_message(os.getenv('ADMIN_CHAT_ID'),f'Пользователь @{ message.from_user.username } запустил бота', reply_markup = get_status_user_keyboard(message.from_user.id)) #TODO добавить клавиатуру админу
-        await bot.send_message(message.from_user.id, 'Ваша заявка на использование бота отправлена. Вы получите уведомление после ее рассмотрения')
-    
+        else:
+
+            if db.get_user_status(username = message.from_user.username)==1:
+
+
+                await message.answer('Здравствуйте!\nВыберите нужный вариант',reply_markup=choose_organization)
+
     else:
-
-        if db.get_user_status(username = message.from_user.username)==1:
-
-
-            await message.answer('Здравствуйте!\nВыберите нужный вариант',reply_markup=choose_organization)
-
-    
+        await message.answer('Здравствуйте!\nПеред использованием бота пожалуйста установите username в профиле.')
 
 
     
